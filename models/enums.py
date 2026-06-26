@@ -1,0 +1,29 @@
+from enum import Enum
+
+class NivelEnum(str, Enum):
+    INICIANTE = "INICIANTE"
+    INTERMEDIARIO = "INTERMEDIARIO"
+    AVANCADO = "AVANCADO"
+
+class ObjetivoEnum(str, Enum):
+    HIPERTROFIA = "HIPERTROFIA"
+    MANUTENCAO = "MANUTENCAO"
+    EMAGRECIMENTO = "EMAGRECIMENTO"
+
+class GrupoMuscularEnum(str, Enum):
+    PEITO = "PEITO"
+    COSTAS = "COSTAS"
+    QUADRICEPS = "QUADRICEPS"
+    POSTERIOR_COXA = "POSTERIOR_COXA"
+    GLUTEOS = "GLUTEOS"
+    PANTURRILHA = "PANTURRILHA"
+    OMBROS = "OMBROS"
+    BICEPS = "BICEPS"
+    TRICEPS = "TRICEPS"
+    CORE = "CORE"
+
+class StatusSessao(str, Enum):
+    PLANEJADA = "PLANEJADA"
+    EM_ANDAMENTO = "EM_ANDAMENTO"
+    CONCLUIDA = "CONCLUIDA"
+    PULADA = "PULADA"
