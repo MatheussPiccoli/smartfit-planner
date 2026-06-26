@@ -1,1 +1,3 @@
 .venv
+banco_smartfit.db
+__pycache__
