@@ -13,7 +13,6 @@ class TelaAutenticacao(ctk.CTkFrame):
         self.user_ctrl = usuario_controller
         self.ao_logar_sucesso = ao_logar_sucesso 
         
-        # Variáveis para guardar o estado entre o Passo 1 e Passo 2
         self.reg_nome = ""
         self.reg_objetivo = None
         self.reg_nivel = None
@@ -26,9 +25,6 @@ class TelaAutenticacao(ctk.CTkFrame):
         for widget in self.winfo_children():
             widget.destroy()
 
-    # ==========================================
-    # TELA 1: LOGIN
-    # ==========================================
     def mostrar_login(self):
         self.limpar_tela()
 
@@ -61,9 +57,6 @@ class TelaAutenticacao(ctk.CTkFrame):
         else:
             messagebox.showerror("Erro", "E-mail ou senha incorretos.")
 
-    # ==========================================
-    # TELA 2: CADASTRO (Passo 1)
-    # ==========================================
     def mostrar_cadastro_passo1(self):
         self.limpar_tela()
 
@@ -112,9 +105,6 @@ class TelaAutenticacao(ctk.CTkFrame):
         except ValueError:
             messagebox.showerror("Erro", "Preencha os treinos por semana com um número.")
 
-    # ==========================================
-    # TELA 3: CADASTRO (Passo 2)
-    # ==========================================
     def mostrar_cadastro_passo2(self):
         self.limpar_tela()
 
@@ -152,7 +142,6 @@ class TelaAutenticacao(ctk.CTkFrame):
                 messagebox.showwarning("Aviso", "E-mail e senha são obrigatórios!")
                 return
 
-            # Chama o Controller para salvar no banco (RNF01)
             novo_aluno = self.user_ctrl.cadastrar_aluno(
                 self.reg_nome, email, senha, self.reg_nivel, 
                 self.reg_objetivo, peso, bf, self.reg_treinos

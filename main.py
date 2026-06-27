@@ -27,6 +27,5 @@ if __name__ == "__main__":
     usuario_ctrl = UsuarioController(db)
     treino_ctrl = TreinoController(db)
     
-    # O app inicia vazio, forçando o login e a navegação real!
     app = SmartFitApp(usuario_ctrl, treino_ctrl)
     app.mainloop()
