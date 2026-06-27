@@ -9,6 +9,7 @@ from models.exercicios import Exercicio, PlanoExercicio
 from models.enums import GrupoMuscularEnum
 from views.auth_view import TelaAutenticacao
 from services.gerador_treinos_iniciais import GeradorTreinosIniciais
+from views.perfil_view import TelaPerfil
 
 COR_FUNDO_CARD = "#1C1C24"
 COR_TEXTO_SECUNDARIO = "#A1A1AA"
@@ -63,7 +64,7 @@ class SmartFitApp(ctk.CTk):
             ("Plano", self.abrir_tela_plano),
             ("Treinar", lambda: self.abrir_tela_treinar(None)),
             ("Progresso", self.abrir_tela_placeholder),
-            ("Perfil", self.abrir_tela_placeholder)
+            ("Perfil", self.abrir_tela_perfil)
         ]
 
         for col, (texto, comando) in enumerate(botoes):
@@ -138,19 +139,31 @@ class SmartFitApp(ctk.CTk):
                 badge.pack(side="right", padx=15)
                 ctk.CTkLabel(badge, text="Amanhã", text_color=COR_AMANHA_FG, font=("Arial", 12, "bold")).pack(padx=10, pady=2)
 
+    # TELA DE TREINO
+
     def abrir_tela_treinar(self, sessao_alvo=None):
         self.limpar_tela_principal()
-        
         aluno_uuid = uuid.UUID(self.aluno_id)
         aluno = self.user_ctrl.db.query(Aluno).filter(Aluno.id == aluno_uuid).first()
 
+        if not aluno.planos:
+            self.abrir_tela_plano()
+            return
+
         if sessao_alvo is None:
             hoje = datetime.now().date()
-            sessao_alvo = next((s for s in aluno.planos[-1].sessoes if s.dataPlanejada == hoje), aluno.planos[-1].sessoes[0])
+            sessao_alvo = next((s for s in aluno.planos[-1].sessoes if s.dataPlanejada == hoje), None)
 
-        if sessao_alvo.nome_sessao == "Descanso":
-            self.abrir_tela_plano()
-            messagebox.showinfo("Descanso", "Hoje é seu dia de descanso planejado!")
+        if not sessao_alvo or sessao_alvo.nome_sessao == "Descanso":
+            resposta = messagebox.askyesno(
+                "Sem treino", 
+                "Você não tem nenhum treino marcado para hoje. Tem certeza que deseja treinar mesmo assim?"
+            )
+            
+            if resposta:
+                self.mostrar_selecao_treino_extra(aluno)
+            else:
+                self.abrir_tela_plano()
             return
 
         ctk.CTkLabel(self.main_frame, text="Treino selecionado", font=("Arial", 28, "bold")).pack(anchor="w", pady=(20, 5))
@@ -163,14 +176,200 @@ class SmartFitApp(ctk.CTk):
         )
         btn_iniciar.pack(fill="x", pady=20)
 
+    def mostrar_selecao_treino_extra(self, aluno):
+        """ Tela intermediária para o usuário escolher qual treino quer adiantar/fazer """
+        self.limpar_tela_principal()
+        
+        ctk.CTkLabel(self.main_frame, text="Treino Extra", font=("Arial", 28, "bold"), text_color=COR_ROXA).pack(anchor="w", pady=(20, 5))
+        ctk.CTkLabel(self.main_frame, text="Escolha qual treino deseja realizar hoje:", font=("Arial", 14), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w", pady=(0, 20))
+
+        scroll = ctk.CTkScrollableFrame(self.main_frame, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
+
+        sessoes_validas = [s for s in aluno.planos[-1].sessoes if s.nome_sessao != "Descanso"]
+        
+        treinos_unicos = []
+        nomes_vistos = set()
+        for s in sessoes_validas:
+            if s.nome_sessao not in nomes_vistos:
+                treinos_unicos.append(s)
+                nomes_vistos.add(s.nome_sessao)
+
+        for sessao in treinos_unicos:
+            card = ctk.CTkFrame(scroll, fg_color=COR_FUNDO_CARD, corner_radius=12, cursor="hand2")
+            card.pack(fill="x", pady=8, ipady=10)
+            
+            card.bind("<Button-1>", lambda e, s=sessao: self.abrir_tela_treinar(s))
+            
+            lbl_nome = ctk.CTkLabel(card, text=sessao.nome_sessao, font=("Arial", 18, "bold"))
+            lbl_nome.pack(padx=20, pady=15, anchor="w")
+            lbl_nome.bind("<Button-1>", lambda e, s=sessao: self.abrir_tela_treinar(s))
+            
+        ctk.CTkButton(
+            self.main_frame, text="Voltar ao Plano", fg_color="transparent", 
+            border_width=1, border_color=COR_ROXA, text_color=COR_TEXTO_SECUNDARIO, 
+            command=self.abrir_tela_plano
+        ).pack(fill="x", pady=20)
+
     def processar_inicio_treino(self, aluno, sessao):
+
         resultado = self.treino_ctrl.iniciar_sessao(aluno.id, sessao.id)
+
         if resultado["status"] == "bloqueio_descanso":
             self.mostrar_alerta_descanso(resultado["mensagem"])
         elif resultado["status"] == "alerta_deload":
             self.mostrar_alerta_deload()
         elif resultado["status"] == "liberado":
             self.abrir_tela_execucao(sessao)
+
+
+    def abrir_tela_execucao(self, sessao):
+        self.sessao_ativa = sessao
+        self.exercicios_sessao = sorted(sessao.exercicios_planejados, key=lambda x: x.ordemNaSessao)
+        
+        self.ex_idx = 0 
+        self.serie_atual_idx = 1
+        self.dados_inputs_series = [] 
+        
+        self.renderizar_exercicio_atual()
+
+    def renderizar_exercicio_atual(self):
+        self.limpar_tela_principal()
+        
+        if self.ex_idx >= len(self.exercicios_sessao):
+            self.finalizar_treino()
+            return
+
+        plano_ex = self.exercicios_sessao[self.ex_idx]
+
+        header = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+        ctk.CTkButton(header, text="← Abandonar", width=60, fg_color="transparent", text_color=COR_TEXTO_SECUNDARIO, command=self.abrir_tela_plano).pack(side="left")
+        ctk.CTkLabel(header, text="Em andamento", text_color=COR_ROXA, font=("Arial", 12, "bold")).pack(side="right")
+
+        ctk.CTkLabel(self.main_frame, text=plano_ex.exercicio.nome, font=("Arial", 24, "bold")).pack(anchor="w", pady=(10, 20))
+
+        card_carga = ctk.CTkFrame(self.main_frame, fg_color=COR_FUNDO_CARD, corner_radius=12)
+        card_carga.pack(fill="x", pady=(0, 20), ipady=15)
+        ctk.CTkLabel(card_carga, text="CARGA SUGERIDA PELO SISTEMA", font=("Arial", 10, "bold"), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w", padx=20, pady=(10, 5))
+        
+        row_carga = ctk.CTkFrame(card_carga, fg_color="transparent")
+        row_carga.pack(fill="x", padx=20)
+        ctk.CTkLabel(row_carga, text=f"{plano_ex.cargaSugerida}", font=("Arial", 36, "bold"), text_color=COR_ROXA).pack(side="left")
+        ctk.CTkLabel(row_carga, text=" kg", font=("Arial", 16, "bold"), text_color=COR_TEXTO_SECUNDARIO).pack(side="left", anchor="s", pady=5)
+
+        colunas = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        colunas.pack(fill="x", padx=10, pady=(10, 5))
+        ctk.CTkLabel(colunas, text="Série", font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO, width=40).pack(side="left")
+        ctk.CTkLabel(colunas, text="Carga (kg)", font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO, width=100).pack(side="left", padx=20)
+        ctk.CTkLabel(colunas, text="Reps", font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO, width=100).pack(side="left")
+
+        self.dados_inputs_series = []
+
+        for i in range(1, plano_ex.seriesPlanejadas + 1):
+            row = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+            row.pack(fill="x", pady=5)
+
+            lbl_serie = ctk.CTkLabel(row, text=str(i), font=("Arial", 16, "bold"), text_color=COR_TEXTO_SECUNDARIO, width=40)
+            lbl_serie.pack(side="left")
+
+            inp_carga = ctk.CTkEntry(row, width=100, justify="center", fg_color="#18181B", border_color="#27272A")
+            inp_carga.insert(0, str(plano_ex.cargaSugerida))
+            inp_carga.pack(side="left", padx=20)
+
+            inp_reps = ctk.CTkEntry(row, width=100, justify="center", fg_color="#18181B", border_color="#27272A")
+            inp_reps.insert(0, str(plano_ex.repsPlanejadas))
+            inp_reps.pack(side="left")
+
+            status_lbl = ctk.CTkLabel(row, text="", width=30)
+            status_lbl.pack(side="left", padx=10)
+
+            self.dados_inputs_series.append({
+                "carga": inp_carga, "reps": inp_reps, 
+                "status": status_lbl, "lbl_serie": lbl_serie
+            })
+
+        self.atualizar_estado_inputs()
+
+    def atualizar_estado_inputs(self):
+        """ Controla visualmente o que está ativo, concluído ou pendente """
+        plano_ex = self.exercicios_sessao[self.ex_idx]
+        
+        for i, dados in enumerate(self.dados_inputs_series):
+            num_serie = i + 1
+            
+            if num_serie < self.serie_atual_idx:
+                dados["carga"].configure(state="disabled", text_color="#34D399", border_color="#18181B")
+                dados["reps"].configure(state="disabled", text_color="#34D399", border_color="#18181B")
+                dados["status"].configure(text="Concluída")
+            elif num_serie == self.serie_atual_idx:
+
+                dados["carga"].configure(state="normal", text_color="white", border_color=COR_ROXA)
+                dados["reps"].configure(state="normal", text_color="white", border_color=COR_ROXA)
+                dados["lbl_serie"].configure(text_color="white")
+            else:
+                dados["carga"].configure(state="disabled", text_color="gray", border_color="#27272A")
+                dados["reps"].configure(state="disabled", text_color="gray", border_color="#27272A")
+
+        if hasattr(self, "btn_acao"):
+            self.btn_acao.destroy()
+
+        if self.serie_atual_idx <= plano_ex.seriesPlanejadas:
+            self.btn_acao = ctk.CTkButton(
+                self.main_frame, text=f"Confirmar série {self.serie_atual_idx}", 
+                height=50, corner_radius=8, font=("Arial", 16, "bold"), fg_color=COR_ROXA,
+                command=self.confirmar_serie_atual
+            )
+        else:
+            is_ultimo = (self.ex_idx == len(self.exercicios_sessao) - 1)
+            texto_btn = "Concluir Treino 🎉" if is_ultimo else "Próximo exercício →"
+            cor_btn = "#10B981" if is_ultimo else "#3B82F6"
+            
+            self.btn_acao = ctk.CTkButton(
+                self.main_frame, text=texto_btn, height=50, corner_radius=8, 
+                font=("Arial", 16, "bold"), fg_color=cor_btn, command=self.avancar_exercicio
+            )
+            
+        self.btn_acao.pack(fill="x", pady=20, side="bottom")
+
+    def confirmar_serie_atual(self):
+        """ DIAGRAMA: Registrar SerieRegistrada """
+        plano_ex = self.exercicios_sessao[self.ex_idx]
+        dados_atuais = self.dados_inputs_series[self.serie_atual_idx - 1]
+        
+        try:
+            carga = float(dados_atuais["carga"].get())
+            reps = int(dados_atuais["reps"].get())
+        except ValueError:
+            messagebox.showerror("Erro", "Preencha a carga e as repetições com números válidos.")
+            return
+
+        aluno_uuid = uuid.UUID(self.aluno_id)
+        aluno = self.user_ctrl.db.query(Aluno).filter(Aluno.id == aluno_uuid).first()
+
+        self.treino_ctrl.registrar_serie_e_progredir(
+            aluno.id, plano_ex.id, carga, reps
+        )
+        
+        self.serie_atual_idx += 1
+        self.atualizar_estado_inputs()
+
+    def avancar_exercicio(self):
+        self.ex_idx += 1
+        self.serie_atual_idx = 1
+        self.renderizar_exercicio_atual()
+
+    def finalizar_treino(self):
+        """ DIAGRAMA: Concluir sessão """
+        self.sessao_ativa.status = "CONCLUIDA"
+        self.treino_ctrl.db.commit()
+        
+        self.limpar_tela_principal()
+        ctk.CTkLabel(self.main_frame, text="", font=("Arial", 60)).pack(pady=(100, 10))
+        ctk.CTkLabel(self.main_frame, text="Treino Concluído!", font=("Arial", 28, "bold"), text_color="#10B981").pack(pady=(0, 20))
+        ctk.CTkLabel(self.main_frame, text=f"Sessão: {self.sessao_ativa.nome_sessao}", text_color="gray").pack()
+        
+        ctk.CTkButton(self.main_frame, text="Voltar ao Início", height=50, font=("Arial", 16, "bold"), command=self.abrir_tela_plano).pack(fill="x", pady=40)
 
     def mostrar_alerta_descanso(self, mensagem):
         self.limpar_tela_principal()
@@ -182,9 +381,13 @@ class SmartFitApp(ctk.CTk):
 
     def mostrar_alerta_deload(self):
         self.limpar_tela_principal()
-        ctk.CTkLabel(self.main_frame, text="Semana de Deload 🔄", font=("Arial", 26, "bold"), text_color="#00D1FF").pack(anchor="w", pady=(0, 20))
+        ctk.CTkLabel(self.main_frame, text="Semana de Deload", font=("Arial", 26, "bold"), text_color="#00D1FF").pack(anchor="w", pady=(0, 20))
         ctk.CTkButton(self.main_frame, text="Iniciar treino de deload", height=50).pack(side="bottom", fill="x", pady=20)
 
-    def abrir_tela_execucao(self, sessao):
+    def abrir_tela_perfil(self):
         self.limpar_tela_principal()
-        ctk.CTkLabel(self.main_frame, text="Sessão Iniciada!", font=("Arial", 22, "bold"), text_color="#10B981").pack(pady=100)
+
+        aluno_uuid = uuid.UUID(self.aluno_id)
+        aluno = self.user_ctrl.db.query(Aluno).filter(Aluno.id == aluno_uuid).first()
+
+        TelaPerfil(self.main_frame, aluno, self.user_ctrl, self.abrir_tela_perfil)
