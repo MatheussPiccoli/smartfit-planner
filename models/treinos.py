@@ -25,7 +25,7 @@ class SessaoTreino(Base):
     
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dataPlanejada = Column(Date, nullable=True)
-    nome_sessao = Column(String(50)) # Ex: "Peito + Tríceps" (Igual ao protótipo do UC02)
+    nome_sessao = Column(String(50))
     status = Column(Enum(StatusSessao), default=StatusSessao.PLANEJADA)
     
     plano_id = Column(Uuid(as_uuid=True), ForeignKey('planos_treino.id', ondelete="CASCADE"))
