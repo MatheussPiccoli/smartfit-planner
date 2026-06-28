@@ -152,7 +152,6 @@ class SmartFitApp(ctk.CTk):
                 badge.pack(side="right", padx=15)
                 ctk.CTkLabel(badge, text="Amanhã", text_color=COR_AMANHA_FG, font=("Arial", 12, "bold")).pack(padx=10, pady=2)
 
-    # TELA DE TREINO
 
     def abrir_tela_treinar(self, sessao_alvo=None):
         self.limpar_tela_principal()

@@ -2,7 +2,6 @@ from models.exercicios import Exercicio
 from models.enums import GrupoMuscularEnum
 
 def obter_catalogo_inicial():
-    """ Retorna uma lista de objetos Exercicio prontos para o banco """
     return [
 
     Exercicio(nome="Supino reto na máquina", grupoMuscular=GrupoMuscularEnum.PEITO, impacto_articular=1),

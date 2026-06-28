@@ -47,7 +47,7 @@ class TreinoController:
         plano.deloadAtivo = True
         for sessao in plano.sessoes:
             for ex in sessao.exercicios_planejados:
-                ex.cargaSugerida = round(ex.cargaSugerida * 0.75, 1) # Reduz 25%
+                ex.cargaSugerida = round(ex.cargaSugerida * 0.75, 1)
         self.db.commit()
 
     def solicitar_substituicao(self, plano_exercicio_id: str) -> list[Exercicio]:
@@ -112,7 +112,7 @@ class TreinoController:
         plano = self.db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
         
         if acao == "IGNORAR":
-            plano.semanas_consecutivas = 1 # Zera o ciclo
+            plano.semanas_consecutivas = 1
             plano.estado_deload = "NORMAL"
         elif acao == "ADIAR":
             plano.estado_deload = "NORMAL"

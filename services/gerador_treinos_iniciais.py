@@ -18,22 +18,19 @@ class GeradorTreinosIniciais:
         db.flush()
 
         hoje = datetime.now().date()
-        inicio_semana = hoje - timedelta(days=hoje.weekday()) # Ancora na Segunda-feira
+        inicio_semana = hoje - timedelta(days=hoje.weekday()) 
 
-        # 1. Ajuste Dinâmico de Intensidade
         if aluno.nivel == NivelEnum.INICIANTE:
             reps, series, mult_carga = 15, 3, 0.6
         elif aluno.nivel == NivelEnum.INTERMEDIARIO:
             reps, series, mult_carga = 12, 4, 1.0
-        else: # Avançado
+        else:
             reps, series, mult_carga = 8, 5, 1.5
 
-        # 2. Resgata a matriz exata (0=Segunda, 1=Terça...)
         cronograma = GeradorTreinosIniciais._obter_matriz_semanal(aluno.nivel, aluno.treinosPorSemana)
 
-        # 3. Constrói os 7 dias da semana para a UI ficar perfeita
+
         for dia_offset in range(7):
-            # Se o dia estiver no cronograma, pega o treino. Senão, é Descanso.
             if dia_offset in cronograma:
                 config = cronograma[dia_offset]
                 nome_sessao = config["nome"]
@@ -82,7 +79,7 @@ class GeradorTreinosIniciais:
     def _obter_matriz_semanal(nivel: NivelEnum, dias: int) -> dict:
         """ 9 Matrizes de Treino Diferentes """
         
-        # ================== 3 DIAS POR SEMANA ==================
+        #3 DIAS POR SEMANA
         if dias <= 3:
             if nivel == NivelEnum.INICIANTE:
                 return {
@@ -96,14 +93,14 @@ class GeradorTreinosIniciais:
                     2: {"nome": "Pull (Puxar)", "grupos": [GrupoMuscularEnum.COSTAS, GrupoMuscularEnum.BICEPS, GrupoMuscularEnum.CORE]},
                     4: {"nome": "Legs (Pernas)", "grupos": [GrupoMuscularEnum.QUADRICEPS, GrupoMuscularEnum.POSTERIOR_COXA, GrupoMuscularEnum.PANTURRILHA]}
                 }
-            else: # Avançado
+            else:
                 return {
                     0: {"nome": "Peito e Costas", "grupos": [GrupoMuscularEnum.PEITO, GrupoMuscularEnum.COSTAS]},
                     2: {"nome": "Pernas Completas", "grupos": [GrupoMuscularEnum.QUADRICEPS, GrupoMuscularEnum.POSTERIOR_COXA, GrupoMuscularEnum.PANTURRILHA]},
                     4: {"nome": "Ombros e Braços", "grupos": [GrupoMuscularEnum.OMBROS, GrupoMuscularEnum.BICEPS, GrupoMuscularEnum.TRICEPS]}
                 }
 
-        # ================== 4 DIAS POR SEMANA ==================
+        #4 DIAS POR SEMANA
         elif dias == 4:
             if nivel == NivelEnum.INICIANTE:
                 return {
@@ -119,7 +116,7 @@ class GeradorTreinosIniciais:
                     3: {"nome": "Pernas", "grupos": [GrupoMuscularEnum.QUADRICEPS, GrupoMuscularEnum.POSTERIOR_COXA, GrupoMuscularEnum.PANTURRILHA]},
                     4: {"nome": "Ombros + Core", "grupos": [GrupoMuscularEnum.OMBROS, GrupoMuscularEnum.CORE]}
                 }
-            else: # Avançado (Upper/Lower Pesado e Leve)
+            else: 
                 return {
                     0: {"nome": "Upper Heavy", "grupos": [GrupoMuscularEnum.PEITO, GrupoMuscularEnum.COSTAS, GrupoMuscularEnum.OMBROS]},
                     1: {"nome": "Lower Heavy", "grupos": [GrupoMuscularEnum.QUADRICEPS, GrupoMuscularEnum.POSTERIOR_COXA]},
@@ -127,7 +124,7 @@ class GeradorTreinosIniciais:
                     4: {"nome": "Lower Pump", "grupos": [GrupoMuscularEnum.QUADRICEPS, GrupoMuscularEnum.POSTERIOR_COXA, GrupoMuscularEnum.PANTURRILHA]}
                 }
 
-        # ================== 5 DIAS POR SEMANA ==================
+        #5 DIAS POR SEMANA
         else:
             if nivel == NivelEnum.INICIANTE:
                 return {
@@ -145,7 +142,7 @@ class GeradorTreinosIniciais:
                     3: {"nome": "Upper", "grupos": [GrupoMuscularEnum.PEITO, GrupoMuscularEnum.COSTAS, GrupoMuscularEnum.OMBROS]},
                     4: {"nome": "Lower", "grupos": [GrupoMuscularEnum.QUADRICEPS, GrupoMuscularEnum.POSTERIOR_COXA, GrupoMuscularEnum.PANTURRILHA]}
                 }
-            else: # Avançado (ABCDE Tradicional)
+            else:
                 return {
                     0: {"nome": "A - Peito", "grupos": [GrupoMuscularEnum.PEITO]},
                     1: {"nome": "B - Costas", "grupos": [GrupoMuscularEnum.COSTAS]},

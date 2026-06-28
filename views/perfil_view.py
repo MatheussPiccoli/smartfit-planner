@@ -70,7 +70,6 @@ class TelaPerfil(ctk.CTkFrame):
     def mostrar_modo_edicao(self):
         self.limpar_tela()
 
-        # Cabeçalho de Edição
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", pady=(20, 10))
         ctk.CTkButton(header, text="← Voltar", width=60, fg_color="transparent", text_color=COR_TEXTO_SECUNDARIO, command=self.mostrar_modo_leitura).pack(side="left")
@@ -116,7 +115,7 @@ class TelaPerfil(ctk.CTkFrame):
             
             if sucesso:
                 messagebox.showinfo("Sucesso", "Perfil atualizado com sucesso!")
-                self.ao_atualizar_callback() # Pede para a main_view recarregar os dados
+                self.ao_atualizar_callback()
             else:
                 messagebox.showerror("Erro", "Não foi possível atualizar o perfil.")
         except ValueError:
