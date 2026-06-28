@@ -88,9 +88,31 @@ class TelaAutenticacao(ctk.CTkFrame):
         self.combo_nivel.pack(fill="x")
 
         self.input_treinos = self.criar_campo(scroll, "Treinos por semana", "Ex: 4")
-        self.input_restricoes = self.criar_campo(scroll, "Restrições físicas (opcional)", "Ex: dor no joelho")
+        ctk.CTkLabel(scroll, text="Restrições físicas (opcional)", font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w", pady=(15, 5))
 
-        ctk.CTkButton(self, text="Continuar →", height=50, corner_radius=8, fg_color=COR_ROXA, font=("Arial", 16, "bold"), command=self.processar_passo_1).pack(fill="x", padx=30, pady=20)
+        frame_restricoes = ctk.CTkFrame(scroll, fg_color="transparent")
+        frame_restricoes.pack(fill="x", pady=5)
+
+        from models.enums import GrupoMuscularEnum
+        self.checkboxes_musculos = {}
+
+        for idx, grupo in enumerate(GrupoMuscularEnum):
+            var = ctk.StringVar(value="")
+            cb = ctk.CTkCheckBox(
+                frame_restricoes, 
+                text=grupo.value, 
+                variable=var, 
+                onvalue=grupo.value, 
+                offvalue="",
+                checkbox_width=20,
+                checkbox_height=20,
+                font=("Arial", 12),
+                text_color="white"
+            )
+            cb.grid(row=idx // 2, column=idx % 2, sticky="w", pady=5, padx=(0, 20))
+            self.checkboxes_musculos[grupo.value] = var
+
+        ctk.CTkButton(self, text="Continuar", height=50, corner_radius=8, fg_color=COR_ROXA, font=("Arial", 16, "bold"), command=self.processar_passo_1).pack(fill="x", padx=30, pady=20)
 
     def criar_campo(self, mestre, label, placeholder):
         ctk.CTkLabel(mestre, text=label, font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w", pady=(10, 5))
@@ -104,7 +126,7 @@ class TelaAutenticacao(ctk.CTkFrame):
             self.reg_objetivo = ObjetivoEnum(self.combo_objetivo.get())
             self.reg_nivel = NivelEnum(self.combo_nivel.get())
             self.reg_treinos = int(self.input_treinos.get() or 4)
-            self.reg_restricoes = self.input_restricoes.get()
+            self.reg_restricoes = [var.get() for var in self.checkboxes_musculos.values() if var.get() != ""]
             self.mostrar_cadastro_passo2()
         except ValueError:
             messagebox.showerror("Erro", "Preencha os treinos por semana com um número.")
@@ -148,7 +170,8 @@ class TelaAutenticacao(ctk.CTkFrame):
 
             novo_aluno = self.user_ctrl.cadastrar_aluno(
                 self.reg_nome, email, senha, self.reg_nivel, 
-                self.reg_objetivo, peso, bf, self.reg_treinos
+                self.reg_objetivo, peso, bf, self.reg_treinos,
+                restricoes_selecionadas=self.reg_restricoes
             )
             
             messagebox.showinfo("Sucesso", "Conta criada com sucesso! Faça login para continuar.")

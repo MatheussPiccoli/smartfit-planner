@@ -30,18 +30,17 @@ class UsuarioController:
         )
         self.db.add(novo_aluno)
 
-        if restricoes_selecionadas is not None:
-            for r in novo_aluno.restricoes:
-                self.db.delete(r)
-            self.db.flush()
-                
+        self.db.flush()
+
+        novo_historico = HistoricoCorporal(aluno_id=novo_aluno.id, peso=peso, percentualGordura=gordura)
+        self.db.add(novo_historico)
+
+        if restricoes_selecionadas:
             for grupo_str in restricoes_selecionadas:
                 grupo_enum = GrupoMuscularEnum(grupo_str)
                 nova_restricao = RestricaoFisica(grupo_afetado=grupo_enum, aluno_id=novo_aluno.id)
                 self.db.add(nova_restricao)
 
-        novo_historico = HistoricoCorporal(aluno_id=novo_aluno.id, peso=peso, percentualGordura=gordura)
-        self.db.add(novo_historico)
         self.db.commit()
         self.db.refresh(novo_aluno)
         return novo_aluno
