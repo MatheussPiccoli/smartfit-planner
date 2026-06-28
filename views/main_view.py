@@ -10,6 +10,7 @@ from models.enums import GrupoMuscularEnum
 from views.auth_view import TelaAutenticacao
 from services.gerador_treinos_iniciais import GeradorTreinosIniciais
 from views.perfil_view import TelaPerfil
+from views.progresso_view import TelaProgresso
 
 COR_FUNDO_CARD = "#1C1C24"
 COR_TEXTO_SECUNDARIO = "#A1A1AA"
@@ -45,10 +46,16 @@ class SmartFitApp(ctk.CTk):
     def iniciar_app_principal(self):
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        self.criar_menu_inferior()
         
-        # Após o login, o usuário é direcionado para a nova Tela de Plano (UC02)
-        self.abrir_tela_plano()
+        from models.usuarios import Usuario
+        usuario_uuid = uuid.UUID(self.aluno_id)
+        usuario_logado = self.user_ctrl.db.query(Usuario).filter(Usuario.id == usuario_uuid).first()
+
+        if usuario_logado.tipo_usuario == "administrador":
+            self.abrir_tela_admin()
+        else:
+            self.criar_menu_inferior()
+            self.abrir_tela_plano()
 
     def limpar_tela_principal(self):
         for widget in self.main_frame.winfo_children():
@@ -63,7 +70,7 @@ class SmartFitApp(ctk.CTk):
             ("Início", self.abrir_tela_placeholder),
             ("Plano", self.abrir_tela_plano),
             ("Treinar", lambda: self.abrir_tela_treinar(None)),
-            ("Progresso", self.abrir_tela_placeholder),
+            ("Progresso", self.abrir_tela_progresso),
             ("Perfil", self.abrir_tela_perfil)
         ]
 
@@ -88,6 +95,12 @@ class SmartFitApp(ctk.CTk):
             aluno = self.user_ctrl.db.query(Aluno).filter(Aluno.id == aluno_uuid).first()
 
         plano_atual = aluno.planos[-1]
+
+        self.treino_ctrl.verificar_e_ativar_deload(plano_atual.id)
+        
+        if plano_atual.estado_deload == "ATIVO":
+            self.desenhar_tela_deload_informativa(plano_atual)
+            return
         
         sessoes = [s for s in plano_atual.sessoes if s.dataPlanejada is not None]
         sessoes = sorted(sessoes, key=lambda s: s.dataPlanejada)
@@ -333,12 +346,14 @@ class SmartFitApp(ctk.CTk):
         self.btn_acao.pack(fill="x", pady=20, side="bottom")
 
     def confirmar_serie_atual(self):
-        """ DIAGRAMA: Registrar SerieRegistrada """
         plano_ex = self.exercicios_sessao[self.ex_idx]
         dados_atuais = self.dados_inputs_series[self.serie_atual_idx - 1]
+
+        carga_digitada = 0.0
+        reps = 0
         
         try:
-            carga = float(dados_atuais["carga"].get())
+            carga_digitada = float(dados_atuais["carga"].get())
             reps = int(dados_atuais["reps"].get())
         except ValueError:
             messagebox.showerror("Erro", "Preencha a carga e as repetições com números válidos.")
@@ -347,12 +362,55 @@ class SmartFitApp(ctk.CTk):
         aluno_uuid = uuid.UUID(self.aluno_id)
         aluno = self.user_ctrl.db.query(Aluno).filter(Aluno.id == aluno_uuid).first()
 
+        if not aluno or not aluno.planos:
+            messagebox.showerror("Erro", "Nenhum plano ativo encontrado para este aluno.")
+            return
+
+        plano_atual = aluno.planos[-1]
+
+        if plano_atual.estado_deload == "ATIVO" and carga_digitada > plano_ex.cargaSugerida:
+            self.mostrar_modal_conflito_deload(plano_atual.id, carga_digitada, reps)
+            return 
+
         self.treino_ctrl.registrar_serie_e_progredir(
-            aluno.id, plano_ex.id, carga, reps
+            aluno.id, plano_ex.id, carga_digitada, reps
         )
         
         self.serie_atual_idx += 1
         self.atualizar_estado_inputs()
+
+    def salvar_serie_e_avancar(self, aluno_id, plano_ex_id, carga, reps):
+        """ Executa a gravação após tudo ser validado """
+        self.treino_ctrl.registrar_serie_e_progredir(aluno_id, plano_ex_id, carga, reps)
+        self.serie_atual_idx += 1
+        self.atualizar_estado_inputs()
+
+    def mostrar_modal_conflito_deload(self, plano_id, carga_digitada, reps):
+        """ Exibe as opções de Ignorar ou Adiar Deload """
+        modal = ctk.CTkToplevel(self)
+        modal.title("Atenção")
+        modal.geometry("350x300")
+        modal.attributes("-topmost", True)
+        modal.resizable(False, False)
+        
+        ctk.CTkLabel(modal, text="Carga Elevada!", font=("Arial", 20, "bold"), text_color="#F59E0B").pack(pady=(20, 10))
+        ctk.CTkLabel(modal, text="Você está tentando usar uma carga superior\nao recomendado para a semana de Deload.", justify="center").pack()
+        ctk.CTkLabel(modal, text="O que deseja fazer?", font=("Arial", 14, "bold")).pack(pady=(15, 10))
+
+        def acao_ignorar():
+            self.treino_ctrl.resolver_conflito_deload(plano_id, "IGNORAR")
+            modal.destroy()
+            self.renderizar_exercicio_atual()
+            messagebox.showinfo("Aviso", "Deload cancelado. A contagem de semanas foi zerada.")
+
+        def acao_adiar():
+            self.treino_ctrl.resolver_conflito_deload(plano_id, "ADIAR")
+            modal.destroy()
+            self.renderizar_exercicio_atual()
+            messagebox.showinfo("Aviso", "Deload adiado para a próxima semana.")
+
+        ctk.CTkButton(modal, text="Ignorar Deload (Zerar Ciclo)", fg_color="#EF4444", hover_color="#B91C1C", command=acao_ignorar).pack(fill="x", padx=20, pady=5)
+        ctk.CTkButton(modal, text="Adiar Deload (Próxima Semana)", fg_color="transparent", border_width=1, text_color="white", command=acao_adiar).pack(fill="x", padx=20, pady=5)
 
     def avancar_exercicio(self):
         self.ex_idx += 1
@@ -391,3 +449,96 @@ class SmartFitApp(ctk.CTk):
         aluno = self.user_ctrl.db.query(Aluno).filter(Aluno.id == aluno_uuid).first()
 
         TelaPerfil(self.main_frame, aluno, self.user_ctrl, self.abrir_tela_perfil)
+        
+        def forcar_semana_8():
+            aluno.planos[-1].semanas_consecutivas = 8
+            self.user_ctrl.db.commit()
+            self.abrir_tela_plano() # Atualiza a tela
+
+        ctk.CTkButton(self.main_frame, text="[TESTE] Simular Chegada na Semana 8", fg_color="#F59E0B", command=forcar_semana_8).pack(pady=10)
+
+    def abrir_tela_progresso(self):
+        self.limpar_tela_principal()
+        
+        aluno_uuid = uuid.UUID(self.aluno_id)
+        aluno = self.user_ctrl.db.query(Aluno).filter(Aluno.id == aluno_uuid).first()
+        
+        TelaProgresso(self.main_frame, aluno, self.user_ctrl.db)
+
+    def desenhar_tela_deload_informativa(self, plano):
+        """ Desenha exatamente o protótipo de UI enviado (image_f8cf85.jpg) """
+        header = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 20))
+        ctk.CTkLabel(header, text="SmartFit", font=("Arial", 20, "bold")).pack(side="left")
+        badge = ctk.CTkFrame(header, fg_color="#451A03", corner_radius=10)
+        badge.pack(side="right")
+        ctk.CTkLabel(badge, text=f"Semana {plano.semanaAtual}", text_color="#FBBF24", font=("Arial", 12, "bold")).pack(padx=10, pady=2)
+
+        ctk.CTkLabel(self.main_frame, text="Aplicado automaticamente", text_color=COR_TEXTO_SECUNDARIO, font=("Arial", 12)).pack(anchor="w")
+        ctk.CTkLabel(self.main_frame, text="Semana de Deload", font=("Arial", 28, "bold"), text_color="#38BDF8").pack(anchor="w", pady=(0, 20))
+
+        card_info = ctk.CTkFrame(self.main_frame, fg_color="#082F49", corner_radius=12, border_width=1, border_color="#0284C7")
+        card_info.pack(fill="x", pady=10, ipady=10, ipadx=10)
+        ctk.CTkLabel(card_info, text="ℹ️ Por que deload agora?", font=("Arial", 14, "bold"), text_color="#38BDF8").pack(anchor="w")
+        ctk.CTkLabel(card_info, text="Você completou 8 semanas consecutivas de treino.\nO sistema reduziu automaticamente a carga em\n25% para recuperação muscular. (RN06)", text_color="#BAE6FD", justify="left").pack(anchor="w", pady=(5,0))
+
+        ctk.CTkLabel(self.main_frame, text="AJUSTE DE CARGAS ESTA SEMANA", font=("Arial", 10, "bold"), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w", pady=(20, 10))
+
+        scroll = ctk.CTkScrollableFrame(self.main_frame, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
+
+        exercicios_exibidos = set()
+        for sessao in plano.sessoes:
+            for ex in sessao.exercicios_planejados:
+                if ex.exercicio.nome not in exercicios_exibidos:
+                    exercicios_exibidos.add(ex.exercicio.nome)
+                    
+                    row = ctk.CTkFrame(scroll, fg_color="transparent")
+                    row.pack(fill="x", pady=10)
+                    
+                    esq = ctk.CTkFrame(row, fg_color="transparent")
+                    esq.pack(side="left")
+                    ctk.CTkLabel(esq, text=ex.exercicio.nome, font=("Arial", 16, "bold")).pack(anchor="w")
+                    ctk.CTkLabel(esq, text=f"Carga normal {ex.carga_original} kg", font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w")
+                    
+                    dir = ctk.CTkFrame(row, fg_color="transparent")
+                    dir.pack(side="right")
+                    ctk.CTkLabel(dir, text=f"{ex.cargaSugerida} kg", font=("Arial", 18, "bold"), text_color="#34D399").pack(anchor="e")
+                    ctk.CTkLabel(dir, text="-25%", font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="e")
+
+        ctk.CTkButton(self.main_frame, text="Iniciar treino de deload", height=50, corner_radius=8, font=("Arial", 16, "bold"), fg_color=COR_ROXA, command=lambda: self.abrir_tela_treinar(None)).pack(fill="x", pady=20, side="bottom")
+
+    def abrir_tela_admin(self):
+        self.limpar_tela_principal()
+        ctk.CTkLabel(self.main_frame, text="Painel Admin", font=("Arial", 28, "bold"), text_color="#F59E0B").pack(pady=30)
+        
+        card = ctk.CTkFrame(self.main_frame, fg_color="#1C1C24", corner_radius=15)
+        card.pack(fill="x", pady=20, ipady=20, ipadx=10)
+        
+        ctk.CTkLabel(card, text="Ferramentas de Teste (Deload)", font=("Arial", 16, "bold"), text_color="white").pack(pady=(0, 15))
+        ctk.CTkLabel(card, text="Digite o e-mail do aluno para forçar a chegada\nda Semana 8 no sistema dele:", text_color="gray").pack(pady=(0, 5))
+        
+        inp_email = ctk.CTkEntry(card, width=250, placeholder_text="email do aluno")
+        inp_email.pack(pady=10)
+        
+        def forcar_deload():
+            email_aluno = inp_email.get()
+            from models.usuarios import Aluno
+            aluno_alvo = self.user_ctrl.db.query(Aluno).filter(Aluno.email == email_aluno).first()
+            
+            if aluno_alvo and aluno_alvo.planos:
+                aluno_alvo.planos[-1].semanas_consecutivas = 8
+                self.user_ctrl.db.commit()
+                messagebox.showinfo("Sucesso", f"Máquina do Tempo ativada!\nO deload de '{aluno_alvo.nome}' chegará no próximo login.")
+                inp_email.delete(0, 'end')
+            else:
+                messagebox.showerror("Erro", "Aluno não encontrado ou ele ainda não logou para gerar o plano inicial.")
+        
+        ctk.CTkButton(card, text="[TESTE] Simular Semana 8", fg_color="#F59E0B", font=("Arial", 14, "bold"), command=forcar_deload).pack(pady=15)
+
+        def fazer_logout():
+            self.aluno_id = None
+            self.main_frame.destroy()
+            self.mostrar_tela_login()
+            
+        ctk.CTkButton(self.main_frame, text="Sair do Sistema", fg_color="transparent", border_width=1, command=fazer_logout).pack(side="bottom", pady=20)

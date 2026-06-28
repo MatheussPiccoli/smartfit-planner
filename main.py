@@ -24,8 +24,12 @@ if __name__ == "__main__":
     
     popular_catalogo_exercicios(db)
 
+    
+
     usuario_ctrl = UsuarioController(db)
     treino_ctrl = TreinoController(db)
+
+    usuario_ctrl.criar_admin_padrao()
     
     app = SmartFitApp(usuario_ctrl, treino_ctrl)
     app.mainloop()

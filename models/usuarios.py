@@ -36,6 +36,7 @@ class Aluno(Usuario):
     
     __mapper_args__ = {'polymorphic_identity': 'aluno'}
     
+    historicos = relationship("HistoricoCorporal", back_populates="aluno", cascade="all, delete-orphan")
     planos = relationship("PlanoTreino", back_populates="aluno", cascade="all, delete-orphan")
     restricoes = relationship("RestricaoFisica", back_populates="aluno", cascade="all, delete-orphan")
     historico_progresso = relationship("HistoricoProgresso", back_populates="aluno", cascade="all, delete-orphan")
@@ -60,3 +61,13 @@ class HistoricoProgresso(Base):
     
     aluno_id = Column(Uuid(as_uuid=True), ForeignKey('alunos.id', ondelete="CASCADE"))
     aluno = relationship("Aluno", back_populates="historico_progresso")
+
+class HistoricoCorporal(Base):
+    __tablename__ = "historico_corporal"
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    aluno_id = Column(String(36), ForeignKey("alunos.id"))
+    peso = Column(Float)
+    percentualGordura = Column(Float)
+    data_registro = Column(DateTime, default=datetime.now)
+
+    aluno = relationship("Aluno", back_populates="historicos")

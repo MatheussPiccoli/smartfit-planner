@@ -51,9 +51,13 @@ class TelaAutenticacao(ctk.CTkFrame):
     def processar_login(self):
         email = self.input_email.get()
         senha = self.input_senha.get()
-        aluno = self.user_ctrl.autenticar(email, senha)
-        if aluno:
-            self.ao_logar_sucesso(str(aluno.id))
+        if not email or not senha:
+            messagebox.showwarning("Aviso", "Preencha todos os campos!")
+            return
+        usuario_logado = self.user_ctrl.autenticar(email, senha)
+
+        if usuario_logado:
+            self.ao_logar_sucesso(str(usuario_logado.id))
         else:
             messagebox.showerror("Erro", "E-mail ou senha incorretos.")
 
