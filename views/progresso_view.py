@@ -27,10 +27,8 @@ class TelaProgresso(ctk.CTkFrame):
         scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         scroll.pack(fill="both", expand=True)
 
-        # 1. Gráfico de Composição Corporal (Peso e BF)
         self.criar_card_grafico(scroll, "Composição Corporal", self.gerar_grafico_corporal())
 
-        # 2. Gráfico de Progressão de Carga
         self.criar_card_grafico(scroll, "Evolução de Força (Volume e Carga)", self.gerar_grafico_cargas())
 
     def criar_card_grafico(self, master, titulo, figure):
@@ -39,14 +37,10 @@ class TelaProgresso(ctk.CTkFrame):
         
         ctk.CTkLabel(card, text=titulo, font=("Arial", 16, "bold"), text_color="white").pack(anchor="w", padx=10, pady=(10, 0))
         
-        # Conecta o Matplotlib dentro do Tkinter
         canvas = FigureCanvasTkAgg(figure, master=card)
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
 
-    # ==========================================
-    # LÓGICA DO GRÁFICO CORPORAL
-    # ==========================================
     def gerar_grafico_corporal(self):
         fig = Figure(figsize=(5, 3), dpi=100, facecolor=COR_FUNDO)
         ax1 = fig.add_subplot(111)
@@ -62,13 +56,11 @@ class TelaProgresso(ctk.CTkFrame):
         pesos = [h.peso for h in historicos]
         bfs = [h.percentualGordura for h in historicos]
 
-        # Linha do Peso
         ax1.plot(datas, pesos, color=COR_PESO, marker='o', linewidth=2, label="Peso (kg)")
         ax1.set_ylabel("Peso (kg)", color=COR_PESO)
         ax1.tick_params(axis='y', labelcolor=COR_PESO)
         ax1.tick_params(axis='x', colors=COR_TEXTO)
 
-        # Linha da Gordura (Eixo Y Secundário à direita)
         ax2 = ax1.twinx()
         ax2.plot(datas, bfs, color=COR_BF, marker='s', linewidth=2, linestyle='--', label="Gordura (%)")
         ax2.set_ylabel("Gordura (%)", color=COR_BF)
@@ -85,15 +77,11 @@ class TelaProgresso(ctk.CTkFrame):
         fig.tight_layout()
         return fig
 
-    # ==========================================
-    # LÓGICA DO GRÁFICO DE CARGAS (Treinos)
-    # ==========================================
     def gerar_grafico_cargas(self):
         fig = Figure(figsize=(5, 3), dpi=100, facecolor=COR_FUNDO)
         ax = fig.add_subplot(111)
         ax.set_facecolor(COR_FUNDO)
 
-        # Busca sessões concluídas do aluno
         sessoes_concluidas = []
         for plano in self.aluno.planos:
             for s in plano.sessoes:
@@ -108,7 +96,6 @@ class TelaProgresso(ctk.CTkFrame):
 
         datas = [s.dataPlanejada.strftime("%d/%m") for s in sessoes_concluidas]
         
-        # Simula o cálculo de tonelagem total (Carga * Reps * Séries) de cada sessão
         volume_total = []
         for sessao in sessoes_concluidas:
             vol = sum((ex.cargaSugerida * ex.repsPlanejadas * ex.seriesPlanejadas) for ex in sessao.exercicios_planejados)
