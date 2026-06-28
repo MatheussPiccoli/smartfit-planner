@@ -6,10 +6,6 @@ from models.enums import NivelEnum, GrupoMuscularEnum
 from models.usuarios import Aluno
 
 class GeradorTreinosIniciais:
-    """
-    Gera o plano cruzando exatamente o Nível (Iniciante, Intermediário, Avançado) 
-    com a Frequência Semanal (3, 4 ou 5 dias), gerando 9 matrizes possíveis.
-    """
 
     @staticmethod
     def gerar(db: Session, aluno: Aluno):
@@ -29,6 +25,7 @@ class GeradorTreinosIniciais:
 
         cronograma = GeradorTreinosIniciais._obter_matriz_semanal(aluno.nivel, aluno.treinosPorSemana)
 
+        grupos_restritos = [r.grupo_afetado for r in aluno.restricoes] if aluno.restricoes else []
 
         for dia_offset in range(7):
             if dia_offset in cronograma:
@@ -56,16 +53,23 @@ class GeradorTreinosIniciais:
                     carga_base = 25.0 * mult_carga
                     
                     GeradorTreinosIniciais._adicionar_exercicio(
-                        db, sessao, grupo_atual, i+1, carga_base, reps, series, offset_ex
+                        db, sessao, grupo_atual, i+1, carga_base, reps, series, offset_ex, grupos_restritos
                     )
 
         db.commit()
 
     @staticmethod
-    def _adicionar_exercicio(db, sessao, grupo: GrupoMuscularEnum, ordem: int, carga: float, reps: int, series: int, offset: int):
-        ex = db.query(Exercicio).filter(Exercicio.grupoMuscular == grupo).offset(offset).first()
+    def _adicionar_exercicio(db, sessao, grupo: GrupoMuscularEnum, ordem: int, carga: float, reps: int, series: int, offset: int, grupos_restritos: list):
+        query = db.query(Exercicio).filter(Exercicio.grupoMuscular == grupo)
+        
+
+        if grupo in grupos_restritos:
+            query = query.filter(Exercicio.impacto_articular < 3)
+
+        ex = query.offset(offset).first()
+        
         if not ex:
-            ex = db.query(Exercicio).filter(Exercicio.grupoMuscular == grupo).first()
+            ex = query.first()
             
         if ex:
             plano_ex = PlanoExercicio(
@@ -77,8 +81,7 @@ class GeradorTreinosIniciais:
 
     @staticmethod
     def _obter_matriz_semanal(nivel: NivelEnum, dias: int) -> dict:
-        """ 9 Matrizes de Treino Diferentes """
-        
+
         #3 DIAS POR SEMANA
         if dias <= 3:
             if nivel == NivelEnum.INICIANTE:

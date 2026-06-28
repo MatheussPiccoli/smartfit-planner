@@ -95,6 +95,29 @@ class TelaPerfil(ctk.CTkFrame):
 
         ctk.CTkButton(self, text="Salvar Alterações", height=50, corner_radius=8, font=("Arial", 16, "bold"), fg_color="#10B981", command=self.salvar_edicao).pack(fill="x", pady=20, side="bottom")
 
+        ctk.CTkLabel(scroll, text="Restrições Físicas (Impacto Alto)", font=("Arial", 14, "bold"), text_color="white").pack(anchor="w", pady=(15, 5))
+        ctk.CTkLabel(scroll, text="O sistema evitará exercícios com impacto articular 3 nos músculos marcados.", font=("Arial", 11), text_color="#A1A1AA").pack(anchor="w", pady=(0, 10))
+
+        frame_restricoes = ctk.CTkFrame(scroll, fg_color="transparent")
+        frame_restricoes.pack(fill="x", pady=5)
+
+        from models.enums import GrupoMuscularEnum
+        self.checkboxes_musculos = {}
+        
+        restricoes_atuais = [r.grupo_afetado.value for r in self.aluno.restricoes]
+
+        for idx, grupo in enumerate(GrupoMuscularEnum):
+            var = ctk.StringVar(value=grupo.value if grupo.value in restricoes_atuais else "")
+            cb = ctk.CTkCheckBox(
+                frame_restricoes, 
+                text=grupo.value, 
+                variable=var, 
+                onvalue=grupo.value, 
+                offvalue=""
+            )
+            cb.grid(row=idx // 2, column=idx % 2, sticky="w", pady=5, padx=(0, 20))
+            self.checkboxes_musculos[grupo.value] = var
+
     def criar_campo(self, mestre, label, valor_atual):
         ctk.CTkLabel(mestre, text=label, font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w", pady=(10, 5))
         entry = ctk.CTkEntry(mestre, height=45, fg_color=COR_FUNDO_INPUT, border_color=COR_BORDA, corner_radius=8)
@@ -110,8 +133,9 @@ class TelaPerfil(ctk.CTkFrame):
             bf = float(self.inp_bf.get())
             objetivo = ObjetivoEnum(self.combo_objetivo.get())
             nivel = NivelEnum(self.combo_nivel.get())
+            restricoes_marcadas = [var.get() for var in self.checkboxes_musculos.values() if var.get() != ""]
 
-            sucesso = self.user_ctrl.atualizar_perfil(self.aluno.id, nome, email, peso, bf, nivel, objetivo)
+            sucesso = self.user_ctrl.atualizar_perfil(self.aluno.id, nome, email, peso, bf, nivel, objetivo, restricoes_selecionadas=restricoes_marcadas)
             
             if sucesso:
                 messagebox.showinfo("Sucesso", "Perfil atualizado com sucesso!")

@@ -20,7 +20,7 @@ class UsuarioController:
         return None
 
     def cadastrar_aluno(self, nome: str, email: str, senha: str, nivel: NivelEnum, 
-                        objetivo: ObjetivoEnum, peso: float, gordura: float, treinos_sem: int) -> Aluno:
+                        objetivo: ObjetivoEnum, peso: float, gordura: float, treinos_sem: int, restricoes_selecionadas=None) -> Aluno:
         senha_criptografada = AuthService.gerar_hash(senha)
         
         novo_aluno = Aluno(
@@ -29,13 +29,24 @@ class UsuarioController:
             percentualGordura=gordura, treinosPorSemana=treinos_sem
         )
         self.db.add(novo_aluno)
+
+        if restricoes_selecionadas is not None:
+            for r in novo_aluno.restricoes:
+                self.db.delete(r)
+            self.db.flush()
+                
+            for grupo_str in restricoes_selecionadas:
+                grupo_enum = GrupoMuscularEnum(grupo_str)
+                nova_restricao = RestricaoFisica(grupo_afetado=grupo_enum, aluno_id=novo_aluno.id)
+                self.db.add(nova_restricao)
+
         novo_historico = HistoricoCorporal(aluno_id=novo_aluno.id, peso=peso, percentualGordura=gordura)
         self.db.add(novo_historico)
         self.db.commit()
         self.db.refresh(novo_aluno)
         return novo_aluno
     
-    def atualizar_perfil(self, aluno_id: str, nome: str, email: str, peso: float, gordura: float, nivel: NivelEnum, objetivo: ObjetivoEnum):
+    def atualizar_perfil(self, aluno_id: str, nome: str, email: str, peso: float, gordura: float, nivel: NivelEnum, objetivo: ObjetivoEnum, restricoes_selecionadas=None):
         if isinstance(aluno_id, str):
             aluno_id = uuid.UUID(aluno_id)
 
@@ -47,6 +58,16 @@ class UsuarioController:
             aluno.percentualGordura = gordura
             aluno.nivel = nivel
             aluno.objetivo = objetivo
+
+            if restricoes_selecionadas is not None:
+                for r in aluno.restricoes:
+                    self.db.delete(r)
+                self.db.flush()
+                
+                for grupo_str in restricoes_selecionadas:
+                    grupo_enum = GrupoMuscularEnum(grupo_str)
+                    nova_restricao = RestricaoFisica(grupo_afetado=grupo_enum, aluno_id=aluno.id)
+                    self.db.add(nova_restricao)
 
             novo_historico = HistoricoCorporal(aluno_id=str(aluno.id), peso=peso, percentualGordura=gordura)
             self.db.add(novo_historico)

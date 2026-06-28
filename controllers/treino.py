@@ -213,3 +213,26 @@ class TreinoController:
             
             sessao.nome_sessao = "Descanso"
             self.db.commit()
+
+    def obter_catalogo_para_aluno(self, aluno_id):
+        from models.exercicios import Exercicio
+        from models.usuarios import Aluno
+        import uuid
+        
+        if isinstance(aluno_id, str): aluno_id = uuid.UUID(aluno_id)
+        
+        aluno = self.db.query(Aluno).filter(Aluno.id == aluno_id).first()
+        grupos_restritos = [r.grupo_afetado for r in aluno.restricoes] if aluno else []
+        
+        catalogo_bruto = self.db.query(Exercicio).filter(
+            (Exercicio.aluno_id == None) | (Exercicio.aluno_id == aluno_id)
+        ).all()
+        
+        catalogo_seguro = []
+        for ex in catalogo_bruto:
+            if ex.grupoMuscular in grupos_restritos and getattr(ex, 'impacto_articular', 0) == 3:
+                continue 
+            
+            catalogo_seguro.append(ex)
+            
+        return catalogo_seguro
