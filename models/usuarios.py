@@ -64,8 +64,8 @@ class HistoricoProgresso(Base):
 
 class HistoricoCorporal(Base):
     __tablename__ = "historico_corporal"
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    aluno_id = Column(String(36), ForeignKey("alunos.id"))
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    aluno_id = Column(Uuid(as_uuid=True), ForeignKey("alunos.id", ondelete="CASCADE"))
     peso = Column(Float)
     percentualGordura = Column(Float)
     data_registro = Column(DateTime, default=datetime.now)

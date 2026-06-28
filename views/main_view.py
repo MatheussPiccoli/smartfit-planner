@@ -63,12 +63,13 @@ class SmartFitApp(ctk.CTk):
             widget.destroy()
 
     def criar_menu_inferior(self):
-        nav_frame = ctk.CTkFrame(self, height=70, corner_radius=0, fg_color="#1E1E2D")
+        self.nav_frame = ctk.CTkFrame(self, height=70, corner_radius=0, fg_color="#1E1E2D")
+        nav_frame = self.nav_frame
         nav_frame.pack(side="bottom", fill="x")
         nav_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
 
         botoes = [
-            ("Início", self.abrir_tela_placeholder),
+            ("Início", self.abrir_tela_inicio),
             ("Plano", self.abrir_tela_plano),
             ("Treinar", lambda: self.abrir_tela_treinar(None)),
             ("Progresso", self.abrir_tela_progresso),
@@ -82,9 +83,72 @@ class SmartFitApp(ctk.CTk):
             )
             btn.grid(row=0, column=col, pady=15, sticky="ew")
 
-    def abrir_tela_placeholder(self):
+    def abrir_tela_inicio(self):
         self.limpar_tela_principal()
-        ctk.CTkLabel(self.main_frame, text="Tela em Construção", font=("Arial", 20)).pack(expand=True)
+        aluno_uuid = uuid.UUID(self.aluno_id)
+        aluno = self.user_ctrl.db.query(Aluno).filter(Aluno.id == aluno_uuid).first()
+
+        if not aluno.planos:
+            GeradorTreinosIniciais.gerar(self.user_ctrl.db, aluno)
+            aluno = self.user_ctrl.db.query(Aluno).filter(Aluno.id == aluno_uuid).first()
+
+        plano = aluno.planos[-1]
+        hoje = datetime.now().date()
+
+        primeiro_nome = aluno.nome.split(" ")[0] if aluno.nome else "Atleta"
+        ctk.CTkLabel(self.main_frame, text=f"Olá, {primeiro_nome} 👋", font=("Arial", 28, "bold")).pack(anchor="w", pady=(10, 0))
+        ctk.CTkLabel(self.main_frame, text="Bora treinar hoje?", font=("Arial", 14), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w", pady=(0, 20))
+
+        scroll = ctk.CTkScrollableFrame(self.main_frame, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
+
+        # Card: treino de hoje
+        sessao_hoje = next((s for s in plano.sessoes if s.dataPlanejada == hoje), None)
+        card_hoje = ctk.CTkFrame(scroll, fg_color=COR_ROXA, corner_radius=15)
+        card_hoje.pack(fill="x", pady=10, ipady=10)
+        ctk.CTkLabel(card_hoje, text="TREINO DE HOJE", font=("Arial", 11, "bold"), text_color="#E9D5FF").pack(anchor="w", padx=20, pady=(12, 0))
+
+        if sessao_hoje and sessao_hoje.nome_sessao != "Descanso":
+            total_ex = len(sessao_hoje.exercicios_planejados)
+            ctk.CTkLabel(card_hoje, text=sessao_hoje.nome_sessao, font=("Arial", 22, "bold"), text_color="white").pack(anchor="w", padx=20)
+            ctk.CTkLabel(card_hoje, text=f"{total_ex} exercícios planejados", font=("Arial", 13), text_color="#E9D5FF").pack(anchor="w", padx=20, pady=(0, 12))
+            ctk.CTkButton(card_hoje, text="▶  Iniciar agora", height=45, fg_color="white", text_color=COR_ROXA, hover_color="#F3F4F6", font=("Arial", 15, "bold"),
+                          command=lambda s=sessao_hoje: self.abrir_tela_treinar(s)).pack(fill="x", padx=20, pady=(0, 12))
+        else:
+            ctk.CTkLabel(card_hoje, text="Dia de Descanso 💤", font=("Arial", 22, "bold"), text_color="white").pack(anchor="w", padx=20)
+            ctk.CTkLabel(card_hoje, text="Recuperação também é treino. Aproveite!", font=("Arial", 13), text_color="#E9D5FF").pack(anchor="w", padx=20, pady=(0, 14))
+
+        # Card: progresso da semana
+        sessoes_plano = [s for s in plano.sessoes if s.nome_sessao != "Descanso"]
+        total_planejado = len(sessoes_plano)
+        concluidos = len([s for s in sessoes_plano if s.status == "CONCLUIDA"])
+
+        card_prog = ctk.CTkFrame(scroll, fg_color=COR_FUNDO_CARD, corner_radius=15)
+        card_prog.pack(fill="x", pady=10, ipady=10)
+        ctk.CTkLabel(card_prog, text="PROGRESSO DA SEMANA", font=("Arial", 11, "bold"), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w", padx=20, pady=(12, 5))
+        ctk.CTkLabel(card_prog, text=f"{concluidos} de {total_planejado} treinos concluídos", font=("Arial", 18, "bold")).pack(anchor="w", padx=20)
+        barra = ctk.CTkProgressBar(card_prog, height=12, progress_color="#10B981")
+        barra.set((concluidos / total_planejado) if total_planejado else 0)
+        barra.pack(fill="x", padx=20, pady=(10, 14))
+
+        # Stats rapidos
+        frame_stats = ctk.CTkFrame(scroll, fg_color="transparent")
+        frame_stats.pack(fill="x", pady=10)
+        frame_stats.grid_columnconfigure((0, 1, 2), weight=1)
+        stats = [("Peso", f"{aluno.peso} kg"), ("Objetivo", aluno.objetivo.value.title()), ("Nível", aluno.nivel.value.title())]
+        for col, (titulo, valor) in enumerate(stats):
+            c = ctk.CTkFrame(frame_stats, fg_color=COR_FUNDO_CARD, corner_radius=12)
+            c.grid(row=0, column=col, padx=4, sticky="ew", ipady=10)
+            ctk.CTkLabel(c, text=titulo, font=("Arial", 11), text_color=COR_TEXTO_SECUNDARIO).pack(pady=(5, 0))
+            ctk.CTkLabel(c, text=valor, font=("Arial", 14, "bold")).pack(pady=(0, 5))
+
+    def logout(self):
+        self.aluno_id = None
+        if hasattr(self, "main_frame") and self.main_frame.winfo_exists():
+            self.main_frame.destroy()
+        if hasattr(self, "nav_frame") and self.nav_frame.winfo_exists():
+            self.nav_frame.destroy()
+        self.mostrar_tela_login()
 
     def abrir_tela_plano(self):
         self.limpar_tela_principal()
@@ -447,12 +511,21 @@ class SmartFitApp(ctk.CTk):
         """ DIAGRAMA: Concluir sessão """
         self.sessao_ativa.status = "CONCLUIDA"
         self.treino_ctrl.db.commit()
-        
+
+        # Se a sessão era de deload, encerra o deload e volta ao ciclo normal (RN06)
+        plano = self.sessao_ativa.plano
+        encerrou_deload = False
+        if plano and plano.estado_deload == "ATIVO":
+            self.treino_ctrl.finalizar_deload(plano.id)
+            encerrou_deload = True
+
         self.limpar_tela_principal()
         ctk.CTkLabel(self.main_frame, text="", font=("Arial", 60)).pack(pady=(100, 10))
         ctk.CTkLabel(self.main_frame, text="Treino Concluído!", font=("Arial", 28, "bold"), text_color="#10B981").pack(pady=(0, 20))
         ctk.CTkLabel(self.main_frame, text=f"Sessão: {self.sessao_ativa.nome_sessao}", text_color="gray").pack()
-        
+        if encerrou_deload:
+            ctk.CTkLabel(self.main_frame, text="Semana de deload concluída! Cargas normais\nrestauradas para o próximo ciclo.", text_color="#38BDF8", justify="center").pack(pady=(15, 0))
+
         ctk.CTkButton(self.main_frame, text="Voltar ao Início", height=50, font=("Arial", 16, "bold"), command=self.abrir_tela_plano).pack(fill="x", pady=40)
 
     def mostrar_alerta_descanso(self, mensagem):
@@ -477,11 +550,15 @@ class SmartFitApp(ctk.CTk):
         TelaPerfil(self.main_frame, aluno, self.user_ctrl, self.abrir_tela_perfil)
         
         def forcar_semana_8():
+            if not aluno.planos:
+                messagebox.showinfo("Aviso", "Abra a aba Plano primeiro para gerar seu treino.")
+                return
             aluno.planos[-1].semanas_consecutivas = 8
             self.user_ctrl.db.commit()
             self.abrir_tela_plano() # Atualiza a tela
 
         ctk.CTkButton(self.main_frame, text="[TESTE] Simular Chegada na Semana 8", fg_color="#F59E0B", command=forcar_semana_8).pack(pady=10)
+        ctk.CTkButton(self.main_frame, text="Sair da conta", fg_color="transparent", border_width=1, border_color="#EF4444", text_color="#EF4444", hover_color="#450a0a", command=self.logout).pack(pady=(0, 10))
 
     def abrir_tela_progresso(self):
         self.limpar_tela_principal()
@@ -532,7 +609,14 @@ class SmartFitApp(ctk.CTk):
                     ctk.CTkLabel(dir, text=f"{ex.cargaSugerida} kg", font=("Arial", 18, "bold"), text_color="#34D399").pack(anchor="e")
                     ctk.CTkLabel(dir, text="-25%", font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="e")
 
-        ctk.CTkButton(self.main_frame, text="Iniciar treino de deload", height=50, corner_radius=8, font=("Arial", 16, "bold"), fg_color=COR_ROXA, command=lambda: self.abrir_tela_treinar(None)).pack(fill="x", pady=20, side="bottom")
+        ctk.CTkButton(self.main_frame, text="Concluir semana de deload", height=40, corner_radius=8, fg_color="transparent", border_width=1, border_color="#38BDF8", text_color="#38BDF8", command=lambda: self._encerrar_deload(plano.id)).pack(fill="x", pady=(0, 10), side="bottom")
+        ctk.CTkButton(self.main_frame, text="Iniciar treino de deload", height=50, corner_radius=8, font=("Arial", 16, "bold"), fg_color=COR_ROXA, command=lambda: self.abrir_tela_treinar(None)).pack(fill="x", pady=(20, 5), side="bottom")
+
+    def _encerrar_deload(self, plano_id):
+        if messagebox.askyesno("Concluir deload", "Encerrar a semana de deload e voltar às cargas normais?"):
+            self.treino_ctrl.finalizar_deload(plano_id)
+            messagebox.showinfo("Pronto", "Deload concluído! Cargas normais restauradas.")
+            self.abrir_tela_plano()
 
     def abrir_tela_admin(self):
         self.limpar_tela_principal()
@@ -562,9 +646,94 @@ class SmartFitApp(ctk.CTk):
         
         ctk.CTkButton(card, text="[TESTE] Simular Semana 8", fg_color="#F59E0B", font=("Arial", 14, "bold"), command=forcar_deload).pack(pady=15)
 
-        def fazer_logout():
-            self.aluno_id = None
-            self.main_frame.destroy()
-            self.mostrar_tela_login()
-            
-        ctk.CTkButton(self.main_frame, text="Sair do Sistema", fg_color="transparent", border_width=1, command=fazer_logout).pack(side="bottom", pady=20)
+        # UC09 - Gerenciar base de exercicios
+        ctk.CTkButton(self.main_frame, text="📋 Gerenciar Base de Exercícios", height=48, corner_radius=10, fg_color=COR_ROXA, font=("Arial", 15, "bold"), command=self.abrir_tela_catalogo_admin).pack(fill="x", pady=10)
+
+        ctk.CTkButton(self.main_frame, text="Sair do Sistema", fg_color="transparent", border_width=1, command=self.logout).pack(side="bottom", pady=20)
+
+    # ============================================================
+    # UC09 - Gerenciar base de exercicios (Painel Admin)
+    # ============================================================
+    def abrir_tela_catalogo_admin(self):
+        self.limpar_tela_principal()
+
+        header = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        header.pack(fill="x", pady=(10, 10))
+        ctk.CTkButton(header, text="← Voltar", width=60, fg_color="transparent", text_color=COR_TEXTO_SECUNDARIO, command=self.abrir_tela_admin).pack(side="left")
+
+        ctk.CTkLabel(self.main_frame, text="Base de Exercícios", font=("Arial", 26, "bold"), text_color="#F59E0B").pack(anchor="w")
+        ctk.CTkLabel(self.main_frame, text="Exercícios disponíveis para todos os alunos", font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w", pady=(0, 10))
+
+        ctk.CTkButton(self.main_frame, text="+ Novo Exercício", height=45, fg_color="#10B981", font=("Arial", 14, "bold"), command=lambda: self.abrir_form_exercicio_admin(None)).pack(fill="x", pady=(0, 10))
+
+        scroll = ctk.CTkScrollableFrame(self.main_frame, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
+
+        catalogo = self.treino_ctrl.listar_catalogo_global()
+        mapa_impacto = {1: "Baixo", 2: "Médio", 3: "Alto"}
+        for ex in catalogo:
+            card = ctk.CTkFrame(scroll, fg_color=COR_FUNDO_CARD, corner_radius=10)
+            card.pack(fill="x", pady=4, ipady=6, ipadx=8)
+
+            info = ctk.CTkFrame(card, fg_color="transparent")
+            info.pack(side="left", fill="x", expand=True)
+            ctk.CTkLabel(info, text=ex.nome, font=("Arial", 14, "bold")).pack(anchor="w")
+            impacto = mapa_impacto.get(ex.impacto_articular, "?")
+            ctk.CTkLabel(info, text=f"{ex.grupoMuscular.value} · impacto {impacto}", font=("Arial", 11), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w")
+
+            botoes = ctk.CTkFrame(card, fg_color="transparent")
+            botoes.pack(side="right")
+            ctk.CTkButton(botoes, text="Editar", width=55, fg_color="#3F3F46", command=lambda e=ex: self.abrir_form_exercicio_admin(e)).pack(side="left", padx=4)
+            ctk.CTkButton(botoes, text="X", width=30, fg_color="#EF4444", command=lambda e=ex: self._remover_exercicio_admin(e)).pack(side="left")
+
+    def _remover_exercicio_admin(self, ex):
+        if not messagebox.askyesno("Remover", f"Remover '{ex.nome}' do catálogo?"):
+            return
+        ok = self.treino_ctrl.remover_exercicio_catalogo(ex.id)
+        if ok:
+            messagebox.showinfo("Sucesso", "Exercício removido.")
+        else:
+            messagebox.showerror("Em uso", "Não dá pra remover: este exercício está sendo usado em treinos de alunos.")
+        self.abrir_tela_catalogo_admin()
+
+    def abrir_form_exercicio_admin(self, ex=None):
+        self.limpar_tela_principal()
+        editando = ex is not None
+
+        ctk.CTkButton(self.main_frame, text="← Cancelar", fg_color="transparent", text_color=COR_TEXTO_SECUNDARIO, command=self.abrir_tela_catalogo_admin).pack(anchor="w", pady=10)
+        ctk.CTkLabel(self.main_frame, text="Editar Exercício" if editando else "Novo Exercício", font=("Arial", 24, "bold")).pack(anchor="w", pady=(0, 20))
+
+        ctk.CTkLabel(self.main_frame, text="Nome", font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w")
+        inp_nome = ctk.CTkEntry(self.main_frame, height=45, placeholder_text="Ex: Supino reto")
+        inp_nome.pack(fill="x", pady=(0, 10))
+        if editando:
+            inp_nome.insert(0, ex.nome)
+
+        ctk.CTkLabel(self.main_frame, text="Grupo muscular", font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w")
+        combo_grupo = ctk.CTkOptionMenu(self.main_frame, values=[g.value for g in GrupoMuscularEnum], height=45)
+        combo_grupo.pack(fill="x", pady=(0, 10))
+        if editando:
+            combo_grupo.set(ex.grupoMuscular.value)
+
+        ctk.CTkLabel(self.main_frame, text="Impacto articular", font=("Arial", 12), text_color=COR_TEXTO_SECUNDARIO).pack(anchor="w")
+        combo_impacto = ctk.CTkOptionMenu(self.main_frame, values=["1 - Baixo", "2 - Médio", "3 - Alto"], height=45)
+        combo_impacto.pack(fill="x", pady=(0, 10))
+        if editando:
+            combo_impacto.set({1: "1 - Baixo", 2: "2 - Médio", 3: "3 - Alto"}.get(ex.impacto_articular, "1 - Baixo"))
+
+        def salvar():
+            nome = inp_nome.get().strip()
+            if not nome:
+                messagebox.showwarning("Aviso", "Dê um nome ao exercício.")
+                return
+            grupo = GrupoMuscularEnum(combo_grupo.get())
+            impacto = int(combo_impacto.get().split(" ")[0])
+            if editando:
+                self.treino_ctrl.editar_exercicio_catalogo(ex.id, nome, grupo, impacto)
+                messagebox.showinfo("Sucesso", "Exercício atualizado!")
+            else:
+                self.treino_ctrl.criar_exercicio_catalogo(nome, grupo, impacto)
+                messagebox.showinfo("Sucesso", "Exercício criado!")
+            self.abrir_tela_catalogo_admin()
+
+        ctk.CTkButton(self.main_frame, text="Salvar", height=50, fg_color="#10B981", font=("Arial", 16, "bold"), command=salvar).pack(fill="x", pady=20)

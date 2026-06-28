@@ -122,8 +122,27 @@ class TreinoController:
                 if ex.carga_original is not None:
                     ex.cargaSugerida = ex.carga_original
                     ex.carga_original = None
-                    
+
         self.db.commit()
+
+    def finalizar_deload(self, plano_id):
+        """Encerra a semana de deload: restaura as cargas normais e reinicia o ciclo."""
+        from models.treinos import PlanoTreino
+        plano = self.db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+        if not plano:
+            return False
+
+        for sessao in plano.sessoes:
+            for ex in sessao.exercicios_planejados:
+                if ex.carga_original is not None:
+                    ex.cargaSugerida = ex.carga_original
+                    ex.carga_original = None
+
+        plano.estado_deload = "NORMAL"
+        plano.deloadAtivo = False
+        plano.semanas_consecutivas = 1
+        self.db.commit()
+        return True
 
     def obter_catalogo_para_aluno(self, aluno_id):
         from models.exercicios import Exercicio
@@ -231,8 +250,47 @@ class TreinoController:
         catalogo_seguro = []
         for ex in catalogo_bruto:
             if ex.grupoMuscular in grupos_restritos and getattr(ex, 'impacto_articular', 0) == 3:
-                continue 
-            
+                continue
+
             catalogo_seguro.append(ex)
-            
+
         return catalogo_seguro
+
+    # ============================================================
+    # UC09 - Gerenciar base de exercicios (Administrador)
+    # ============================================================
+    def listar_catalogo_global(self):
+        from models.exercicios import Exercicio
+        return self.db.query(Exercicio).filter(
+            Exercicio.aluno_id == None
+        ).order_by(Exercicio.nome).all()
+
+    def criar_exercicio_catalogo(self, nome, grupo, impacto):
+        from models.exercicios import Exercicio
+        novo = Exercicio(nome=nome, grupoMuscular=grupo, impacto_articular=impacto, aluno_id=None)
+        self.db.add(novo)
+        self.db.commit()
+        return novo
+
+    def editar_exercicio_catalogo(self, ex_id, nome, grupo, impacto):
+        from models.exercicios import Exercicio
+        ex = self.db.query(Exercicio).filter(Exercicio.id == ex_id).first()
+        if ex:
+            ex.nome = nome
+            ex.grupoMuscular = grupo
+            ex.impacto_articular = impacto
+            self.db.commit()
+            return True
+        return False
+
+    def remover_exercicio_catalogo(self, ex_id):
+        from models.exercicios import Exercicio, PlanoExercicio
+        em_uso = self.db.query(PlanoExercicio).filter(PlanoExercicio.exercicio_id == ex_id).first()
+        if em_uso:
+            return False  # exercicio em uso em algum treino: nao remove
+        ex = self.db.query(Exercicio).filter(Exercicio.id == ex_id).first()
+        if ex:
+            self.db.delete(ex)
+            self.db.commit()
+            return True
+        return False

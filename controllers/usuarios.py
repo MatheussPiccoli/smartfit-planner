@@ -14,8 +14,7 @@ class UsuarioController:
         from models.usuarios import Usuario
         from services.auth import AuthService
         usuario = self.db.query(Usuario).filter(Usuario.email == email).first()
-        if usuario:
-            senha_valida = AuthService.verificar_senha(senha_plana, usuario.senhaHash)
+        if usuario and AuthService.verificar_senha(senha_plana, usuario.senhaHash):
             return usuario
         return None
 
@@ -68,7 +67,7 @@ class UsuarioController:
                     nova_restricao = RestricaoFisica(grupo_afetado=grupo_enum, aluno_id=aluno.id)
                     self.db.add(nova_restricao)
 
-            novo_historico = HistoricoCorporal(aluno_id=str(aluno.id), peso=peso, percentualGordura=gordura)
+            novo_historico = HistoricoCorporal(aluno_id=aluno.id, peso=peso, percentualGordura=gordura)
             self.db.add(novo_historico)
 
             self.db.commit()

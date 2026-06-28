@@ -70,6 +70,8 @@ class TelaEdicaoTreino(ctk.CTkFrame):
             
             botoes = ctk.CTkFrame(card, fg_color="transparent")
             botoes.pack(side="right")
+            # UC06: substituicao segura (RN03) - sugere alternativas de menor impacto articular
+            ctk.CTkButton(botoes, text="🛡", width=34, fg_color="#0EA5E9", command=lambda p=plano_ex: self.abrir_substituicao_segura(p)).pack(side="left", padx=(0, 5))
             ctk.CTkButton(botoes, text="Trocar", width=60, fg_color="#3F3F46", command=lambda p=plano_ex: self.abrir_selecao_exercicio(p)).pack(side="left", padx=5)
             # NOVO: Botão Remover (X)
             ctk.CTkButton(botoes, text="X", width=30, fg_color="#EF4444", command=lambda p_id=plano_ex.id: self.remover_exercicio(p_id)).pack(side="left")
@@ -184,4 +186,37 @@ class TelaEdicaoTreino(ctk.CTkFrame):
     def executar_clonagem(self, sessao_origem_id):
         self.treino_ctrl.clonar_sessao(sessao_origem_id, self.sessao.id)
         self.treino_ctrl.db.refresh(self.sessao)
+        self.mostrar_detalhes_sessao()
+
+    # ==========================================
+    # UC06: SUBSTITUICAO SEGURA (RN03)
+    # ==========================================
+    def abrir_substituicao_segura(self, plano_ex):
+        self.limpar()
+        ctk.CTkButton(self, text="← Cancelar", fg_color="transparent", command=self.mostrar_detalhes_sessao).pack(anchor="w", pady=10)
+        ctk.CTkLabel(self, text="Substituição Segura", font=("Arial", 22, "bold"), text_color="#0EA5E9").pack(anchor="w")
+        ctk.CTkLabel(self, text=f'Alternativas para "{plano_ex.exercicio.nome}" com\nimpacto articular igual ou menor (RN03).', font=("Arial", 12), text_color=COR_TEXTO_SEC, justify="left").pack(anchor="w", pady=(0, 10))
+
+        sugestoes = self.treino_ctrl.solicitar_substituicao(plano_ex.id)
+        mapa = {1: "Baixo", 2: "Médio", 3: "Alto"}
+
+        if not sugestoes:
+            ctk.CTkLabel(self, text="Nenhuma alternativa mais segura\nencontrada para este grupo muscular.", text_color=COR_TEXTO_SEC, justify="center").pack(expand=True)
+            return
+
+        lista = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        lista.pack(fill="both", expand=True)
+        for ex in sugestoes:
+            card = ctk.CTkFrame(lista, fg_color=COR_FUNDO, corner_radius=10)
+            card.pack(fill="x", pady=4, ipady=6, ipadx=8)
+            info = ctk.CTkFrame(card, fg_color="transparent")
+            info.pack(side="left", fill="x", expand=True)
+            ctk.CTkLabel(info, text=ex.nome, font=("Arial", 14, "bold")).pack(anchor="w")
+            ctk.CTkLabel(info, text=f"Impacto {mapa.get(ex.impacto_articular, '?')}", font=("Arial", 11), text_color="#34D399").pack(anchor="w")
+            ctk.CTkButton(card, text="Usar", width=60, fg_color="#0EA5E9", command=lambda e=ex: self._confirmar_substituicao_segura(plano_ex, e.id)).pack(side="right")
+
+    def _confirmar_substituicao_segura(self, plano_ex, novo_ex_id):
+        self.treino_ctrl.confirmar_substituicao(str(self.aluno.id), plano_ex.id, novo_ex_id)
+        self.treino_ctrl.db.refresh(self.sessao)
+        messagebox.showinfo("Sucesso", "Exercício substituído com segurança!")
         self.mostrar_detalhes_sessao()
