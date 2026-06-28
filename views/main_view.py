@@ -11,6 +11,7 @@ from views.auth_view import TelaAutenticacao
 from services.gerador_treinos_iniciais import GeradorTreinosIniciais
 from views.perfil_view import TelaPerfil
 from views.progresso_view import TelaProgresso
+from views.edicao_treino_view import TelaEdicaoTreino
 
 COR_FUNDO_CARD = "#1C1C24"
 COR_TEXTO_SECUNDARIO = "#A1A1AA"
@@ -126,22 +127,32 @@ class SmartFitApp(ctk.CTk):
             card = ctk.CTkFrame(scroll, fg_color=COR_FUNDO_CARD, corner_radius=15, cursor="hand2")
             card.pack(fill="x", pady=8, ipady=10)
 
-            card.bind("<Button-1>", lambda e, s=sessao: self.abrir_tela_treinar(s))
+            card.bind("<Button-1>", lambda e, s=sessao: self.abrir_detalhes_treino(s))
 
             esq_frame = ctk.CTkFrame(card, fg_color="transparent")
             esq_frame.pack(side="left", padx=15)
-            esq_frame.bind("<Button-1>", lambda e, s=sessao: self.abrir_tela_treinar(s))
+            
+            esq_frame.bind("<Button-1>", lambda e, s=sessao: self.abrir_detalhes_treino(s))
 
             dia_idx = sessao.dataPlanejada.weekday()
-            ctk.CTkLabel(esq_frame, text=dias_semana_str[dia_idx], font=("Arial", 12, "bold"), text_color=COR_ROXA).pack(anchor="w")
-            ctk.CTkLabel(esq_frame, text=sessao.nome_sessao, font=("Arial", 18, "bold")).pack(anchor="w")
+            
+            lbl_dia = ctk.CTkLabel(esq_frame, text=dias_semana_str[dia_idx], font=("Arial", 12, "bold"), text_color=COR_ROXA)
+            lbl_dia.pack(anchor="w")
+            lbl_dia.bind("<Button-1>", lambda e, s=sessao: self.abrir_detalhes_treino(s))
+
+            lbl_nome = ctk.CTkLabel(esq_frame, text=sessao.nome_sessao, font=("Arial", 18, "bold"))
+            lbl_nome.pack(anchor="w")
+            lbl_nome.bind("<Button-1>", lambda e, s=sessao: self.abrir_detalhes_treino(s))
             
             if sessao.nome_sessao != "Descanso":
                 total_ex = len(sessao.exercicios_planejados)
                 total_series = sum(ex.seriesPlanejadas for ex in sessao.exercicios_planejados)
-                ctk.CTkLabel(esq_frame, text=f"{total_ex} exercícios · {total_series} séries", text_color=COR_TEXTO_SECUNDARIO, font=("Arial", 12)).pack(anchor="w")
+                lbl_desc = ctk.CTkLabel(esq_frame, text=f"{total_ex} exercícios · {total_series} séries", text_color=COR_TEXTO_SECUNDARIO, font=("Arial", 12))
             else:
-                ctk.CTkLabel(esq_frame, text="Recuperação ativa", text_color=COR_TEXTO_SECUNDARIO, font=("Arial", 12)).pack(anchor="w")
+                lbl_desc = ctk.CTkLabel(esq_frame, text="Recuperação ativa", text_color=COR_TEXTO_SECUNDARIO, font=("Arial", 12))
+            
+            lbl_desc.pack(anchor="w")
+            lbl_desc.bind("<Button-1>", lambda e, s=sessao: self.abrir_detalhes_treino(s))
 
             if sessao.dataPlanejada == hoje:
                 badge = ctk.CTkFrame(card, fg_color=COR_HOJE_BG, corner_radius=10)
@@ -152,6 +163,22 @@ class SmartFitApp(ctk.CTk):
                 badge.pack(side="right", padx=15)
                 ctk.CTkLabel(badge, text="Amanhã", text_color=COR_AMANHA_FG, font=("Arial", 12, "bold")).pack(padx=10, pady=2)
 
+
+    def abrir_detalhes_treino(self, sessao):
+        self.limpar_tela_principal()
+        
+        from models.usuarios import Aluno
+        aluno_uuid = uuid.UUID(self.aluno_id)
+        aluno = self.user_ctrl.db.query(Aluno).filter(Aluno.id == aluno_uuid).first()
+        
+        TelaEdicaoTreino(
+            self.main_frame, 
+            aluno, 
+            sessao, 
+            self.treino_ctrl,
+            callback_voltar=self.abrir_tela_plano,
+            callback_iniciar=self.abrir_tela_treinar
+        )
 
     def abrir_tela_treinar(self, sessao_alvo=None):
         self.limpar_tela_principal()

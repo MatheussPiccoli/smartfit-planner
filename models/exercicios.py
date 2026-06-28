@@ -17,6 +17,10 @@ class Exercicio(Base):
     impacto_articular = Column(Integer, default=1) 
     equipamentoNecessario = Column(String(100), nullable=True)
 
+    aluno_id = Column(Uuid(as_uuid=True), ForeignKey('alunos.id', ondelete="CASCADE"), nullable=True)
+
+    dono = relationship("Aluno", backref="exercicios_personalizados")
+
 class PlanoExercicio(Base):
     __tablename__ = 'planos_exercicio'
     

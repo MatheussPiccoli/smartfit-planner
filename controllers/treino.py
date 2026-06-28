@@ -124,3 +124,92 @@ class TreinoController:
                     ex.carga_original = None
                     
         self.db.commit()
+
+    def obter_catalogo_para_aluno(self, aluno_id):
+        from models.exercicios import Exercicio
+        import uuid
+        if isinstance(aluno_id, str): aluno_id = uuid.UUID(aluno_id)
+        
+        return self.db.query(Exercicio).filter(
+            (Exercicio.aluno_id == None) | (Exercicio.aluno_id == aluno_id)
+        ).all()
+
+    def criar_exercicio_personalizado(self, aluno_id, nome, grupo):
+        from models.exercicios import Exercicio
+        import uuid
+        if isinstance(aluno_id, str): aluno_id = uuid.UUID(aluno_id)
+        
+        novo_ex = Exercicio(nome=nome, grupoMuscular=grupo, aluno_id=aluno_id)
+        self.db.add(novo_ex)
+        self.db.flush()
+        return novo_ex
+
+    def trocar_exercicio_da_sessao(self, plano_ex_id, novo_exercicio_id):
+        from models.exercicios import PlanoExercicio
+        plano_ex = self.db.query(PlanoExercicio).filter(PlanoExercicio.id == plano_ex_id).first()
+        if plano_ex:
+            plano_ex.exercicio_id = novo_exercicio_id
+            self.db.commit()
+
+    def atualizar_nome_sessao(self, sessao_id, novo_nome):
+        from models.treinos import SessaoTreino
+        sessao = self.db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).first()
+        if sessao:
+            sessao.nome_sessao = novo_nome
+            self.db.commit()
+
+    def clonar_sessao(self, sessao_origem_id, sessao_destino_id):
+        from models.treinos import SessaoTreino
+        from models.exercicios import PlanoExercicio
+        
+        origem = self.db.query(SessaoTreino).filter(SessaoTreino.id == sessao_origem_id).first()
+        destino = self.db.query(SessaoTreino).filter(SessaoTreino.id == sessao_destino_id).first()
+        
+        if origem and destino:
+            destino.nome_sessao = origem.nome_sessao + " (Cópia)"
+            for ex_origem in origem.exercicios_planejados:
+                novo_ex = PlanoExercicio(
+                    cargaSugerida=ex_origem.cargaSugerida,
+                    repsPlanejadas=ex_origem.repsPlanejadas,
+                    seriesPlanejadas=ex_origem.seriesPlanejadas,
+                    ordemNaSessao=ex_origem.ordemNaSessao,
+                    sessao=destino,
+                    exercicio_id=ex_origem.exercicio_id
+                )
+                self.db.add(novo_ex)
+            self.db.commit()
+
+    def remover_exercicio_da_sessao(self, plano_ex_id):
+        from models.exercicios import PlanoExercicio
+        plano_ex = self.db.query(PlanoExercicio).filter(PlanoExercicio.id == plano_ex_id).first()
+        if plano_ex:
+            self.db.delete(plano_ex)
+            self.db.commit()
+
+    def adicionar_exercicio_na_sessao(self, sessao_id, exercicio_id):
+        from models.exercicios import PlanoExercicio
+        from models.treinos import SessaoTreino
+        sessao = self.db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).first()
+        
+        if sessao:
+            nova_ordem = len(sessao.exercicios_planejados) + 1
+            novo_ex = PlanoExercicio(
+                cargaSugerida=10.0, 
+                repsPlanejadas=10,  
+                seriesPlanejadas=3, 
+                ordemNaSessao=nova_ordem,
+                sessao=sessao,
+                exercicio_id=exercicio_id
+            )
+            self.db.add(novo_ex)
+            self.db.commit()
+
+    def remover_sessao_inteira(self, sessao_id):
+        from models.treinos import SessaoTreino
+        sessao = self.db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).first()
+        if sessao:
+            for ex in sessao.exercicios_planejados:
+                self.db.delete(ex)
+            
+            sessao.nome_sessao = "Descanso"
+            self.db.commit()
