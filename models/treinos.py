@@ -20,6 +20,9 @@ class PlanoTreino(Base):
     
     sessoes = relationship("SessaoTreino", back_populates="plano", cascade="all, delete-orphan")
 
+    semanas_consecutivas = Column(Integer, default=1)
+    estado_deload = Column(String, default="NORMAL")
+
 class SessaoTreino(Base):
     __tablename__ = 'sessoes_treino'
     

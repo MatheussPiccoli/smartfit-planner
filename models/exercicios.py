@@ -34,6 +34,7 @@ class PlanoExercicio(Base):
     
     series_executadas = relationship("SerieRegistrada", back_populates="plano_referencia", cascade="all, delete-orphan")
 
+    carga_original = Column(Float, nullable=True)
 class SerieRegistrada(Base):
     __tablename__ = 'series_registradas'
     

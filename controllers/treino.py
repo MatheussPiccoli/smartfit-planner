@@ -91,3 +91,36 @@ class TreinoController:
 
         self.db.commit()
         return {"status": "sucesso", "nova_carga_sugerida": plano_ex.cargaSugerida}
+
+    def verificar_e_ativar_deload(self, plano_id):
+        from models.treinos import PlanoTreino
+        plano = self.db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+        
+        if plano and plano.semanas_consecutivas >= 8 and plano.estado_deload == "NORMAL":
+            plano.estado_deload = "ATIVO"
+            for sessao in plano.sessoes:
+                for ex in sessao.exercicios_planejados:
+                    if ex.carga_original is None:
+                        ex.carga_original = ex.cargaSugerida
+                    ex.cargaSugerida = round(ex.carga_original * 0.75, 1)
+            self.db.commit()
+            return True
+        return False
+
+    def resolver_conflito_deload(self, plano_id, acao):
+        from models.treinos import PlanoTreino
+        plano = self.db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+        
+        if acao == "IGNORAR":
+            plano.semanas_consecutivas = 1 # Zera o ciclo
+            plano.estado_deload = "NORMAL"
+        elif acao == "ADIAR":
+            plano.estado_deload = "NORMAL"
+
+        for sessao in plano.sessoes:
+            for ex in sessao.exercicios_planejados:
+                if ex.carga_original is not None:
+                    ex.cargaSugerida = ex.carga_original
+                    ex.carga_original = None
+                    
+        self.db.commit()
