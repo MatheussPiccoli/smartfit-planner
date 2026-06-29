@@ -33,9 +33,7 @@ class TelaEdicaoTreino(ctk.CTkFrame):
         else:
             self.mostrar_detalhes_sessao()
 
-    # ==========================================
-    # CENA 1: DETALHES E EDIÇÃO DO TREINO
-    # ==========================================
+
     def mostrar_detalhes_sessao(self):
         self.limpar()
         
@@ -43,8 +41,7 @@ class TelaEdicaoTreino(ctk.CTkFrame):
         header.pack(fill="x", pady=(10, 20))
         ctk.CTkButton(header, text="← Voltar", width=60, fg_color="transparent", command=self.callback_voltar).pack(side="left")
         
-        # Botão Excluir Treino (Canto Superior Direito)
-        ctk.CTkButton(header, text="🗑️ Excluir Treino", width=40, fg_color="transparent", text_color="#EF4444", hover_color="#450a0a", command=self.remover_treino_inteiro).pack(side="right")
+        ctk.CTkButton(header, text="Excluir Treino", width=40, fg_color="transparent", text_color="#EF4444", hover_color="#450a0a", command=self.remover_treino_inteiro).pack(side="right")
         
         linha_nome = ctk.CTkFrame(self, fg_color="transparent")
         linha_nome.pack(fill="x", pady=(0, 20))
@@ -98,13 +95,12 @@ class TelaEdicaoTreino(ctk.CTkFrame):
         if messagebox.askyesno("Aviso", "Tem certeza que deseja apagar este treino e transformar o dia em descanso?"):
             self.treino_ctrl.remover_sessao_inteira(self.sessao.id)
             messagebox.showinfo("Sucesso", "Treino removido. O dia foi definido como Descanso.")
-            self.callback_voltar() # Volta para a tela inicial (calendário)
+            self.callback_voltar() 
 
 
     def abrir_selecao_exercicio(self, plano_ex_alvo=None):
         self.limpar()
         
-        # Se for trocar, usa o grupo do exercício. Se for adicionar, lista todos como padrão.
         grupo_atual = plano_ex_alvo.exercicio.grupoMuscular.value if plano_ex_alvo else "TODOS"
         titulo = "Trocar Exercício" if plano_ex_alvo else "Adicionar Exercício"
         
@@ -188,9 +184,7 @@ class TelaEdicaoTreino(ctk.CTkFrame):
         self.treino_ctrl.db.refresh(self.sessao)
         self.mostrar_detalhes_sessao()
 
-    # ==========================================
-    # UC06: SUBSTITUICAO SEGURA (RN03)
-    # ==========================================
+
     def abrir_substituicao_segura(self, plano_ex):
         self.limpar()
         ctk.CTkButton(self, text="← Cancelar", fg_color="transparent", command=self.mostrar_detalhes_sessao).pack(anchor="w", pady=10)

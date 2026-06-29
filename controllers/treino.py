@@ -126,7 +126,6 @@ class TreinoController:
         self.db.commit()
 
     def finalizar_deload(self, plano_id):
-        """Encerra a semana de deload: restaura as cargas normais e reinicia o ciclo."""
         from models.treinos import PlanoTreino
         plano = self.db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
         if not plano:
@@ -256,9 +255,7 @@ class TreinoController:
 
         return catalogo_seguro
 
-    # ============================================================
-    # UC09 - Gerenciar base de exercicios (Administrador)
-    # ============================================================
+#fgerenciar base
     def listar_catalogo_global(self):
         from models.exercicios import Exercicio
         return self.db.query(Exercicio).filter(
@@ -287,7 +284,7 @@ class TreinoController:
         from models.exercicios import Exercicio, PlanoExercicio
         em_uso = self.db.query(PlanoExercicio).filter(PlanoExercicio.exercicio_id == ex_id).first()
         if em_uso:
-            return False  # exercicio em uso em algum treino: nao remove
+            return False 
         ex = self.db.query(Exercicio).filter(Exercicio.id == ex_id).first()
         if ex:
             self.db.delete(ex)

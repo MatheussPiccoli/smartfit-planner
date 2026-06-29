@@ -66,7 +66,6 @@ class TelaProgresso(ctk.CTkFrame):
         ax2.set_ylabel("Gordura (%)", color=COR_BF)
         ax2.tick_params(axis='y', labelcolor=COR_BF)
 
-        # Estética Dark Mode
         for ax in [ax1, ax2]:
             ax.spines['bottom'].set_color('#27272A')
             ax.spines['top'].set_visible(False)
